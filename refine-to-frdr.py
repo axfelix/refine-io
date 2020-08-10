@@ -1,3 +1,4 @@
+import os
 import sys
 import csv
 
@@ -8,9 +9,9 @@ params = {}
 
 class DBInterface:
     def __init__(self, params):
-        self.dbtype = params.get('type', None)
-        self.dbname = params.get('dbname', None)
-        self.host = params.get('host', None)
+        self.dbtype = params.get('type', 'sqlite')
+        self.dbname = params.get('dbname', 'data/globus_oai.db')
+        self.host = params.get('host', 'localhost')
         self.schema = params.get('schema', None)
         self.user = params.get('user', None)
         self.password = params.get('pass', None)
@@ -42,12 +43,15 @@ class DBInterface:
     def getCursor(self, con):
         if self.dbtype == "sqlite":
             con.row_factory = self.getRow()
-        cur = con.cursor()
+            cur = con.cursor()
         if self.dbtype == "postgres":
             from psycopg2.extras import RealDictCursor
             cur = con.cursor(cursor_factory=RealDictCursor)
 
         return cur
+
+    def getRow(self):
+        return self.dblayer.Row
 
     def _prep(self, statement):
         if (self.dbtype == "postgres"):
@@ -55,12 +59,15 @@ class DBInterface:
         return statement
 
 with open(sys.argv[1], encoding='utf-8') as csvfile:
-	reader = csv.DictReader(csvfile)
-	for row in reader:
-		if row['No match (no equivalent orbroader term)'] == 'y' or row['No match (need access to dataset for context)'] == 'y':
-			continue
-		elif row['Correct auto match to FAST'] == 'y' or row['Manual match to FAST (Within OpenRefine choices)'] == 'y' or row['Manual match to FAST (Need to Look at FAST)'] == 'y' or row['Manual match to FAST (Broader Heading)'] == 'y':
-			con = DBInterface.getConnection()
-			with con:
-				cur = DBInterface.getCursor(con)
-				cur.execute(self._prep("""UPDATE tags SET reconciled = ? WHERE tag = ?"""), ('Reconciliation', 'Original Keyword'))
+    reader = csv.DictReader(csvfile)
+    dbh = DBInterface(params)
+    con = dbh.getConnection()
+    cur = dbh.getCursor(con)
+    for row in reader:
+        if row['No match (no equivalent or broader term)'] == 'y' or row['No match (need access to dataset for context)'] == 'y':
+            continue
+        elif row['Correct auto match to FAST'] == 'y' or row['Manual match to FAST (Within OpenRefine choices)'] == 'y' or row['Manual match to FAST (Need to Look at FAST)'] == 'y' or row['Manual match to FAST (Broader Heading)'] == 'y':
+            print(row['Reconciliation'], " ----- ", row['Original Keyword'])
+            if len(sys.argv) > 2 and sys.argv[2] == '--dryrun':
+                continue
+            cur.execute(self._prep("""UPDATE tags SET reconciled = ? WHERE tag = ?"""), (row['Reconciliation'], row['Original Keyword']))
