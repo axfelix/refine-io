@@ -70,4 +70,11 @@ with open(sys.argv[1], encoding='utf-8') as csvfile:
             print(row['Reconciliation'], " ----- ", row['Original Keyword'])
             if len(sys.argv) > 2 and sys.argv[2] == '--dryrun':
                 continue
-            cur.execute(self._prep("""UPDATE tags SET reconciled = ? WHERE tag = ?"""), (row['Reconciliation'], row['Original Keyword']))
+            cur.execute("SELECT tag_id FROM tags WHERE tag=?", (row['Original Keyword'],))
+            tag_id = cur.fetchone()
+            try:
+                cur.execute(self._prep("""INSERT INTO reconciliations (tag_id, reconciliation, language) VALUES (?,?,?)""", (tag_id, row['Reconciliation'], 'en')))
+                if row['Reconciliation - Additional Term'] is not None:
+                    cur.execute(self._prep("""INSERT INTO reconciliations (tag_id, reconciliation, language) VALUES (?,?,?)""", (tag_id, row['Reconciliation - Additional Term'], 'en')))
+            except IntegrityError:
+                pass
