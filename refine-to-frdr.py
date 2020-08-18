@@ -67,14 +67,15 @@ with open(sys.argv[1], encoding='utf-8') as csvfile:
         if row['No match (no equivalent or broader term)'] == 'y' or row['No match (need access to dataset for context)'] == 'y':
             continue
         elif row['Correct auto match to FAST'] == 'y' or row['Manual match to FAST (Within OpenRefine choices)'] == 'y' or row['Manual match to FAST (Need to Look at FAST)'] == 'y' or row['Manual match to FAST (Broader Heading)'] == 'y':
-            print(row['Reconciliation'], " ----- ", row['Original Keyword'])
             if len(sys.argv) > 2 and sys.argv[2] == '--dryrun':
                 continue
             cur.execute("SELECT tag_id FROM tags WHERE tag=?", (row['Original Keyword'],))
             tag_id = cur.fetchone()
             try:
-                cur.execute(self._prep("""INSERT INTO reconciliations (tag_id, reconciliation, language) VALUES (?,?,?)""", (tag_id, row['Reconciliation'], 'en')))
+                cur.execute(dbh._prep("""INSERT INTO reconciliations (tag_id, reconciliation, language) VALUES (?,?,?)"""), (tag_id, row['Reconciliation'], 'en'))
                 if row['Reconciliation - Additional Term'] is not None:
-                    cur.execute(self._prep("""INSERT INTO reconciliations (tag_id, reconciliation, language) VALUES (?,?,?)""", (tag_id, row['Reconciliation - Additional Term'], 'en')))
-            except IntegrityError:
+                    cur.execute(dbh._prep("""INSERT INTO reconciliations (tag_id, reconciliation, language) VALUES (?,?,?)"""), (tag_id, row['Reconciliation - Additional Term'], 'en'))
+            except dbh.dblayer.IntegrityError as e:
+                pass
+            except dbh.dblayer.InterfaceError as e:
                 pass
